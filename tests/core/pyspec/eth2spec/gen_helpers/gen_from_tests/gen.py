@@ -59,7 +59,8 @@ def generate_from_tests(runner_name: str, handler_name: str, src: Any,
 def get_provider(create_provider_fn: Callable[[SpecForkName, PresetBaseName, str, str], TestProvider],
                  fork_name: SpecForkName,
                  preset_name: PresetBaseName,
-                 all_mods: Dict[str, Dict[str, Union[List[str], str]]]) -> Iterable[TestProvider]:
+                 all_mods: Dict[str, Dict[str, Union[List[str], str]]],
+                 phase: SpecForkName=None) -> Iterable[TestProvider]:
     for key, mod_name in all_mods[fork_name].items():
         if not isinstance(mod_name, List):
             mod_name = [mod_name]
@@ -68,6 +69,7 @@ def get_provider(create_provider_fn: Callable[[SpecForkName, PresetBaseName, str
             preset_name=preset_name,
             handler_name=key,
             tests_src_mod_name=mod_name,
+            phase=phase,
         )
 
 
@@ -77,7 +79,7 @@ def get_create_provider_fn(runner_name: str) -> Callable[[SpecForkName, str, str
         return
 
     def create_provider(fork_name: SpecForkName, preset_name: PresetBaseName,
-                        handler_name: str, tests_src_mod_name: List[str]) -> TestProvider:
+                        handler_name: str, tests_src_mod_name: List[str], phase: SpecForkName=None) -> TestProvider:
         def cases_fn() -> Iterable[TestCase]:
             for mod_name in tests_src_mod_name:
                 tests_src = import_module(mod_name)
@@ -87,6 +89,7 @@ def get_create_provider_fn(runner_name: str) -> Callable[[SpecForkName, str, str
                     src=tests_src,
                     fork_name=fork_name,
                     preset_name=preset_name,
+                    phase=phase,
                 )
 
         return TestProvider(prepare=prepare_fn, make_cases=cases_fn)
@@ -103,11 +106,13 @@ def run_state_test_generators(runner_name: str,
     for preset_name in presets:
         for fork_name in forks:
             if fork_name in all_mods:
+                phase = None
                 gen_runner.run_generator(runner_name, get_provider(
                     create_provider_fn=get_create_provider_fn(runner_name),
                     fork_name=fork_name,
                     preset_name=preset_name,
                     all_mods=all_mods,
+                    phase=phase,
                 ))
 
 

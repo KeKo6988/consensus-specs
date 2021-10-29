@@ -1,5 +1,9 @@
 from enum import Enum, auto
 
+from eth2spec.test.context import (
+    ALTAIR,
+    MERGE,
+)
 from eth2spec.test.helpers.attester_slashings import (
     get_valid_attester_slashing_by_indices,
 )
@@ -133,17 +137,25 @@ def state_transition_across_slots_with_ignoring_proposers(spec,
             next_slot(spec, state)
 
 
-def do_altair_fork(state, spec, post_spec, fork_epoch, with_block=True, operation_dict=None):
+def do_fork(state, spec, post_spec, fork_epoch, with_block=True, operation_dict=None):
     spec.process_slots(state, state.slot + 1)
 
     assert state.slot % spec.SLOTS_PER_EPOCH == 0
     assert spec.get_current_epoch(state) == fork_epoch
 
-    state = post_spec.upgrade_to_altair(state)
+    if post_spec.fork == ALTAIR:
+        state = post_spec.upgrade_to_altair(state)
+    elif post_spec.fork == MERGE:
+        state = post_spec.upgrade_to_merge(state)
 
     assert state.fork.epoch == fork_epoch
-    assert state.fork.previous_version == post_spec.config.GENESIS_FORK_VERSION
-    assert state.fork.current_version == post_spec.config.ALTAIR_FORK_VERSION
+
+    if post_spec.fork == ALTAIR:
+        assert state.fork.previous_version == post_spec.config.GENESIS_FORK_VERSION
+        assert state.fork.current_version == post_spec.config.ALTAIR_FORK_VERSION
+    elif post_spec.fork == MERGE:
+        assert state.fork.previous_version == post_spec.config.ALTAIR_FORK_VERSION
+        assert state.fork.current_version == post_spec.config.MERGE_FORK_VERSION
 
     if with_block:
         return state, _state_transition_and_sign_block_at_slot(post_spec, state, operation_dict=operation_dict)
@@ -280,7 +292,7 @@ def run_transition_with_operation(state,
 
     # irregular state transition to handle fork:
     _operation_at_slot = operation_dict if is_at_fork else None
-    state, block = do_altair_fork(state, spec, post_spec, fork_epoch, operation_dict=_operation_at_slot)
+    state, block = do_fork(state, spec, post_spec, fork_epoch, operation_dict=_operation_at_slot)
     blocks.append(post_tag(block))
 
     if is_at_fork:
